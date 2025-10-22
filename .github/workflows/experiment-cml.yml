@@ -1,8 +1,8 @@
 name: CML Model Comparison Pipeline
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: write          # needed for commit comments & asset uploads
+  pull-requests: write     # needed for PR comments
 
 on:
   push:
@@ -29,18 +29,15 @@ jobs:
           pip install -r requirements.txt
 
       - name: Train all models
-        run: |
-          python train_experiments.py
+        run: python train_experiments.py
 
       - name: Compare models and generate report assets
-        run: |
-          python compare_models.py
+        run: python compare_models.py
 
       - name: Install CML
         run: npm install -g @dvcorg/cml
 
       - name: Build markdown report
-        shell: bash
         run: |
           {
             echo "# 🏆 Rapport de Comparaison de Modèles - Exercice 3"
@@ -74,10 +71,25 @@ jobs:
             echo "</details>"
           } > report.md
 
+      # 👉 Explicit, event-aware targets + always pass the file
       - name: Post CML comment (PR or commit)
         env:
-          # Prefer a PAT in CML_TOKEN for forked PRs; fallback to GITHUB_TOKEN for pushes/same-repo PRs
+          # Prefer a PAT for forked PRs: add a repo-scoped PAT in secrets as CML_TOKEN.
+          # Falls back to GitHub-provided token for pushes / same-repo PRs.
           REPO_TOKEN: ${{ secrets.CML_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Try to comment on the PR; if not a PR or insufficient permission, comment on the commit
-          cml comment create --pr report.md || cml comment create --commit report.md
+          set -euo pipefail
+
+          # Determine target explicitly to avoid "PR not found" errors
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            TARGET="pr/${{ github.event.pull_request.number }}"
+          else
+            TARGET="commit/${{ github.sha }}"
+          fi
+
+          # Create the comment (CML auto-uploads images referenced in the markdown)
+          cml comment create --target="$TARGET" report.md || {
+            echo "CML comment failed; falling back to commit comment via CML auto-target…" >&2
+            cml comment create --target="commit/${{ github.sha }}" report.md
+          }

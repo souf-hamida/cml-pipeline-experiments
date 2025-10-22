@@ -1,82 +1,83 @@
 name: CML Model Comparison Pipeline
 
+permissions:
+  contents: write
+  pull-requests: write
+
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   train-compare-report:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
-      - name: Install dependencies
+
+      - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Train all models
         run: |
           python train_experiments.py
-      
-      - name: Compare models and generate report
+
+      - name: Compare models and generate report assets
         run: |
           python compare_models.py
-      
-      - name: Create CML report
-        env:
-          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          npm install -g @dvcorg/cml
-          
-          echo "# 🏆 Rapport de Comparaison de Modèles - Exercice 3" >> report.md
-          echo "" >> report.md
-          
-          echo "## 🎯 Meilleur Modèle Sélectionné" >> report.md
-          echo "" >> report.md
-          echo '```json' >> report.md
-          cat experiments/best_model.json >> report.md
-          echo '```' >> report.md
-          echo "" >> report.md
-          
-          echo "## 📊 Comparaison des Accuracy" >> report.md
-          echo "" >> report.md
-          cml publish reports/accuracy_comparison.png --md >> report.md
-          echo "" >> report.md
-          
-          echo "## 📈 Comparaison de Toutes les Métriques" >> report.md
-          echo "" >> report.md
-          cml publish reports/all_metrics_comparison.png --md >> report.md
-          echo "" >> report.md
-          
-          echo "## 🔥 Heatmap des Performances" >> report.md
-          echo "" >> report.md
-          cml publish reports/performance_heatmap.png --md >> report.md
-          echo "" >> report.md
-          
-          echo "## 📋 Résultats Détaillés" >> report.md
-          echo "" >> report.md
-          echo "<details>" >> report.md
-          echo "<summary>Cliquez pour voir tous les résultats</summary>" >> report.md
-          echo "" >> report.md
-          echo '```json' >> report.md
-          cat experiments/all_results.json >> report.md
-          echo '```' >> report.md
-          echo "</details>" >> report.md
-          
-          cml comment create report.md
 
+      - name: Install CML
+        run: npm install -g @dvcorg/cml
+
+      - name: Build markdown report
+        shell: bash
+        run: |
+          {
+            echo "# 🏆 Rapport de Comparaison de Modèles - Exercice 3"
+            echo
+            echo "## 🎯 Meilleur Modèle Sélectionné"
+            echo
+            echo '```json'
+            cat experiments/best_model.json
+            echo '```'
+            echo
+            echo "## 📊 Comparaison des Accuracy"
+            echo
+            echo "![accuracy](reports/accuracy_comparison.png)"
+            echo
+            echo "## 📈 Comparaison de Toutes les Métriques"
+            echo
+            echo "![all-metrics](reports/all_metrics_comparison.png)"
+            echo
+            echo "## 🔥 Heatmap des Performances"
+            echo
+            echo "![heatmap](reports/performance_heatmap.png)"
+            echo
+            echo "## 📋 Résultats Détaillés"
+            echo
+            echo "<details>"
+            echo "<summary>Cliquez pour voir tous les résultats</summary>"
+            echo
+            echo '```json'
+            cat experiments/all_results.json
+            echo '```'
+            echo "</details>"
+          } > report.md
+
+      - name: Post CML comment (PR or commit)
+        env:
+          # Prefer a PAT in CML_TOKEN for forked PRs; fallback to GITHUB_TOKEN for pushes/same-repo PRs
+          REPO_TOKEN: ${{ secrets.CML_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # Try to comment on the PR; if not a PR or insufficient permission, comment on the commit
+          cml comment create --pr report.md || cml comment create --commit report.md

@@ -1,8 +1,8 @@
 name: CML Model Comparison Pipeline
 
 permissions:
-  contents: write          # needed for commit comments & asset uploads
-  pull-requests: write     # needed for PR comments
+  contents: write          # pour commentaires de commit & upload d'assets
+  pull-requests: write     # pour commentaires sur PR
 
 on:
   push:
@@ -38,58 +38,59 @@ jobs:
         run: npm install -g @dvcorg/cml
 
       - name: Build markdown report
+        shell: bash
         run: |
-          {
-            echo "# 🏆 Rapport de Comparaison de Modèles - Exercice 3"
-            echo
-            echo "## 🎯 Meilleur Modèle Sélectionné"
-            echo
-            echo '```json'
-            cat experiments/best_model.json
-            echo '```'
-            echo
-            echo "## 📊 Comparaison des Accuracy"
-            echo
-            echo "![accuracy](reports/accuracy_comparison.png)"
-            echo
-            echo "## 📈 Comparaison de Toutes les Métriques"
-            echo
-            echo "![all-metrics](reports/all_metrics_comparison.png)"
-            echo
-            echo "## 🔥 Heatmap des Performances"
-            echo
-            echo "![heatmap](reports/performance_heatmap.png)"
-            echo
-            echo "## 📋 Résultats Détaillés"
-            echo
-            echo "<details>"
-            echo "<summary>Cliquez pour voir tous les résultats</summary>"
-            echo
-            echo '```json'
-            cat experiments/all_results.json
-            echo '```'
-            echo "</details>"
-          } > report.md
+          # (Optionnel) jolis JSON si jq présent ; sinon, on garde brut
+          best_json=$( (jq '.' experiments/best_model.json) || cat experiments/best_model.json )
+          all_json=$( (jq '.' experiments/all_results.json) || cat experiments/all_results.json )
 
-      # 👉 Explicit, event-aware targets + always pass the file
+          cat > report.md <<'MD'
+          # 🏆 Rapport de Comparaison de Modèles — Exercice 3
+
+          ## 🎯 Meilleur Modèle Sélectionné
+
+          ```json
+          MD
+          printf '%s\n' "$best_json" >> report.md
+          cat >> report.md <<'MD'
+          ```
+
+          ## 📊 Comparaison des Accuracy
+
+          ![accuracy](reports/accuracy_comparison.png)
+
+          ## 📈 Comparaison de Toutes les Métriques
+
+          ![all-metrics](reports/all_metrics_comparison.png)
+
+          ## 🔥 Heatmap des Performances
+
+          ![heatmap](reports/performance_heatmap.png)
+
+          ## 📋 Résultats Détaillés
+
+          <details>
+          <summary>Cliquez pour voir tous les résultats</summary>
+
+          ```json
+          MD
+          printf '%s\n' "$all_json" >> report.md
+          cat >> report.md <<'MD'
+          ```
+          </details>
+          MD
+
       - name: Post CML comment (PR or commit)
         env:
-          # Prefer a PAT for forked PRs: add a repo-scoped PAT in secrets as CML_TOKEN.
-          # Falls back to GitHub-provided token for pushes / same-repo PRs.
+          # Recommandé: PAT avec scope "repo" nommé CML_TOKEN pour commenter sur PRs de fork
           REPO_TOKEN: ${{ secrets.CML_TOKEN || secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          # Determine target explicitly to avoid "PR not found" errors
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            TARGET="pr/${{ github.event.pull_request.number }}"
-          else
-            TARGET="commit/${{ github.sha }}"
-          fi
-
-          # Create the comment (CML auto-uploads images referenced in the markdown)
-          cml comment create --target="$TARGET" report.md || {
-            echo "CML comment failed; falling back to commit comment via CML auto-target…" >&2
-            cml comment create --target="commit/${{ github.sha }}" report.md
-          }
+          # Si c'est une PR de fork et qu'on n'a PAS de CML_TOKEN, on évite l'erreur et on log seulement
+          if [[ "${EVENT_NAME}" == "pull_request" ]] && [[ "${IS_FORK:-false}" == "true" ]] && [[ -z "${{ secrets.CML_TOKEN }}" ]]; then
+            echo "::warning::PR depuis un fork : GITHUB_T_

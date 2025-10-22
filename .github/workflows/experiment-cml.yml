@@ -1,8 +1,8 @@
 name: CML Model Comparison Pipeline
 
 permissions:
-  contents: write          # pour commentaires de commit & upload d'assets
-  pull-requests: write     # pour commentaires sur PR
+  contents: write
+  pull-requests: write
 
 on:
   push:
@@ -13,7 +13,6 @@ on:
 jobs:
   train-compare-report:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,10 +36,10 @@ jobs:
       - name: Install CML
         run: npm install -g @dvcorg/cml
 
+      # ✅ Build report via here-doc (pas d'expressions GitHub dans le script)
       - name: Build markdown report
         shell: bash
         run: |
-          # (Optionnel) jolis JSON si jq présent ; sinon, on garde brut
           best_json=$( (jq '.' experiments/best_model.json) || cat experiments/best_model.json )
           all_json=$( (jq '.' experiments/all_results.json) || cat experiments/all_results.json )
 
@@ -80,17 +79,45 @@ jobs:
           </details>
           MD
 
+      # ✅ Plus de ${ { ... } } dans le script. On passe tout via env, puis bash gère.
       - name: Post CML comment (PR or commit)
         env:
-          # Recommandé: PAT avec scope "repo" nommé CML_TOKEN pour commenter sur PRs de fork
-          REPO_TOKEN: ${{ secrets.CML_TOKEN || secrets.GITHUB_TOKEN }}
-          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          # Tokens bruts en env
+          CML_TOKEN: ${{ secrets.CML_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Indicateurs/infos d’événement prêts à l’emploi (valeurs littérales)
           EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          IS_FORK_RAW: ${{ github.event.pull_request.head.repo.fork }}
           SHA: ${{ github.sha }}
+        shell: bash
         run: |
           set -euo pipefail
 
-          # Si c'est une PR de fork et qu'on n'a PAS de CML_TOKEN, on évite l'erreur et on log seulement
-          if [[ "${EVENT_NAME}" == "pull_request" ]] && [[ "${IS_FORK:-false}" == "true" ]] && [[ -z "${{ secrets.CML_TOKEN }}" ]]; then
-            echo "::warning::PR depuis un fork : GITHUB_T_
+          # Normaliser IS_FORK (vide -> false)
+          IS_FORK="${IS_FORK_RAW:-false}"
+          if [[ -z "${IS_FORK}" ]]; then IS_FORK="false"; fi
+
+          # Choisir le token: préférer CML_TOKEN s'il existe, sinon GITHUB_TOKEN
+          REPO_TOKEN="${CML_TOKEN:-$GITHUB_TOKEN}"
+          export REPO_TOKEN
+
+          # Si PR depuis un fork et pas de PAT, éviter l'échec PR et commenter le commit
+          if [[ "${EVENT_NAME}" == "pull_request" && "${IS_FORK}" == "true" && -z "${CML_TOKEN}" ]]; then
+            echo "::warning::PR depuis un fork : GITHUB_TOKEN ne peut pas commenter la PR. Ajoutez un PAT dans secrets.CML_TOKEN pour activer le commentaire PR. Fallback: commentaire sur le commit."
+            cml comment create --target="commit/${SHA}" report.md
+            exit 0
+          fi
+
+          # Cibler explicitement PR ou commit
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            TARGET="pr/${PR_NUMBER}"
+          else
+            TARGET="commit/${SHA}"
+          fi
+
+          # Créer le commentaire ; CML uploade les images mentionnées dans report.md
+          cml comment create --target="${TARGET}" report.md || {
+            echo "CML a échoué sur ${TARGET}; tentative fallback sur le commit…" >&2
+            cml comment create --target="commit/${SHA}" report.md
+          }

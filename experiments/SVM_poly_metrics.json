@@ -1,0 +1,14 @@
+{
+  "name": "SVM_poly",
+  "algorithm": "SVC",
+  "params": {
+    "kernel": "poly",
+    "degree": 3
+  },
+  "accuracy": 1.0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1_score": 1.0,
+  "test_size": 30,
+  "timestamp": "2025-10-21T06:03:11.470846"
+}

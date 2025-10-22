@@ -1,0 +1,81 @@
+[
+  {
+    "name": "RandomForest_50",
+    "algorithm": "RandomForestClassifier",
+    "params": {
+      "n_estimators": 50
+    },
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "test_size": 30,
+    "timestamp": "2025-10-21T06:03:10.938502"
+  },
+  {
+    "name": "RandomForest_100",
+    "algorithm": "RandomForestClassifier",
+    "params": {
+      "n_estimators": 100
+    },
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "test_size": 30,
+    "timestamp": "2025-10-21T06:03:11.112813"
+  },
+  {
+    "name": "RandomForest_200",
+    "algorithm": "RandomForestClassifier",
+    "params": {
+      "n_estimators": 200
+    },
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "test_size": 30,
+    "timestamp": "2025-10-21T06:03:11.393167"
+  },
+  {
+    "name": "SVM_linear",
+    "algorithm": "SVC",
+    "params": {
+      "kernel": "linear"
+    },
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "test_size": 30,
+    "timestamp": "2025-10-21T06:03:11.457534"
+  },
+  {
+    "name": "SVM_rbf",
+    "algorithm": "SVC",
+    "params": {
+      "kernel": "rbf"
+    },
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "test_size": 30,
+    "timestamp": "2025-10-21T06:03:11.464316"
+  },
+  {
+    "name": "SVM_poly",
+    "algorithm": "SVC",
+    "params": {
+      "kernel": "poly",
+      "degree": 3
+    },
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "test_size": 30,
+    "timestamp": "2025-10-21T06:03:11.470846"
+  }
+]

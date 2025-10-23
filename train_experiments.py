@@ -15,7 +15,7 @@ X, y = iris.data, iris.target
 
 # Split train/test
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+    X, y, test_size=0.25, random_state=42
 )
 
 # Définir la matrice d'expériences
